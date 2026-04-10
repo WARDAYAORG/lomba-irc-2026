@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Akses Tryout IRC</title>
+    <title>Akses Lomba IRC</title>
     <!-- Tailwind CSS via CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -21,8 +21,8 @@
         <!-- Form Section -->
         <div class="p-8">
             <div class="text-center mb-6">
-                <h1 class="text-3xl font-extrabold text-blue-800 mb-2">Portal Tryout IRC</h1>
-                <p class="text-gray-500 text-sm">Masukkan <span class="font-semibold text-red-600">ID Peserta</span> Anda untuk mengakses link Tryout.</p>
+                <h1 class="text-3xl font-extrabold text-blue-800 mb-2">Portal Lomba IRC</h1>
+                <p class="text-gray-500 text-sm">Masukkan <span class="font-semibold text-red-600">ID Peserta</span> Anda untuk mengakses link lomba.</p>
             </div>
 
             <form id="tryoutForm" class="space-y-5">
@@ -42,7 +42,7 @@
                     id="submitBtn" 
                     class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-200 transition-all flex justify-center items-center shadow-md hover:shadow-lg"
                 >
-                    <span id="btnText">Cek Akses Tryout</span>
+                    <span id="btnText">Cek Akses Lomba</span>
                     <!-- Loading Spinner -->
                     <svg id="spinner" class="hidden animate-spin ml-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -125,14 +125,14 @@
                 const bidangLomba = bidangMapping[kodeBidang] || kodeBidang;
 
                 // --- STEP 3: FETCH TRYOUT LINK BASED ON "BIDANG" ---
-                btnText.textContent = "Mengambil Data Tryout...";
+                btnText.textContent = "Mengambil Data Lomba...";
                 
                 // Note: The API docs said "Requires superuser Authorization" for lomba_irc_tryout. 
                 // If you set the PocketBase API Rule for View/List to public (""), this fetch will work seamlessly.
-                const tryoutQueryUrl = `${baseUrl}/lomba_irc_tryout/records?filter=(bidang='${encodeURIComponent(bidangLomba)}')`;
+                const tryoutQueryUrl = `${baseUrl}/lomba_irc/records?filter=(bidang='${encodeURIComponent(bidangLomba)}')`;
                 const tryoutRes = await fetch(tryoutQueryUrl);
                 
-                if (!tryoutRes.ok) throw new Error("Gagal mengambil data Tryout (Cek Izin API Pocketbase).");
+                if (!tryoutRes.ok) throw new Error("Tidak Ada Lomba.");
                 const tryoutData = await tryoutRes.json();
 
                 // --- STEP 4: RENDER RESULTS ---
@@ -145,7 +145,7 @@
                 // Reset Button State
                 submitBtn.disabled = false;
                 submitBtn.classList.remove('opacity-75', 'cursor-not-allowed');
-                btnText.textContent = "Cek Akses Tryout";
+                btnText.textContent = "Cek Akses Lomba";
                 spinner.classList.add('hidden');
                 resultsSection.classList.remove('hidden');
             }
@@ -167,8 +167,8 @@
             if (!tryoutItems || tryoutItems.length === 0) {
                 html += `
                     <div class="bg-yellow-100 text-yellow-800 p-4 rounded-lg border border-yellow-300">
-                        <p class="font-bold">Tryout belum tersedia.</p>
-                        <p class="text-sm mt-1">Belum ada jadwal tryout untuk bidang <span class="font-semibold">${escapeHTML(bidangLomba)}</span> saat ini.</p>
+                        <p class="font-bold">Lomba belum tersedia.</p>
+                        <p class="text-sm mt-1">Belum ada jadwal lomba untuk bidang <span class="font-semibold">${escapeHTML(bidangLomba)}</span> saat ini.</p>
                     </div>
                 `;
             } else {
@@ -191,10 +191,10 @@
                             <div class="mt-4">
                                 ${isAktif 
                                     ? `<a href="${escapeHTML(tryout.link)}" target="_blank" rel="noopener noreferrer" class="block w-full text-center bg-red-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-red-700 transition-colors shadow">
-                                        Mulai Tryout Sekarang
+                                        Mulai Lomba Sekarang
                                        </a>` 
                                     : `<button disabled class="w-full bg-gray-100 text-gray-500 font-bold py-3 px-4 rounded-lg border border-gray-200 cursor-not-allowed">
-                                        Tryout Belum Aktif
+                                        Lomba Belum Aktif
                                        </button>`
                                 }
                             </div>
