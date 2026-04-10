@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Akses Tryout IRC</title>
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { scroll-behavior: smooth; }
+    </style>
+</head>
+<body class="bg-yellow-50 min-h-screen flex items-center justify-center p-4 font-sans text-slate-800">
+
+    <!-- Main Container -->
+    <main class="max-w-lg w-full bg-white rounded-xl shadow-2xl overflow-hidden relative">
+        
+        <!-- Yellow-Red-Blue Decorative Top Border -->
+        <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-yellow-400 via-red-500 to-blue-600"></div>
+
+        <!-- Form Section -->
+        <div class="p-8">
+            <div class="text-center mb-6">
+                <h1 class="text-3xl font-extrabold text-blue-800 mb-2">Portal Tryout IRC</h1>
+                <p class="text-gray-500 text-sm">Masukkan <span class="font-semibold text-red-600">ID Peserta</span> Anda untuk mengakses link Tryout.</p>
+            </div>
+
+            <form id="tryoutForm" class="space-y-5">
+                <div>
+                    <label for="id_peserta" class="block text-sm font-bold text-blue-700 mb-1">ID Peserta</label>
+                    <input 
+                        type="text" 
+                        id="id_peserta" 
+                        required 
+                        placeholder="Contoh: F-MAT-R3-D730K" 
+                        class="w-full px-4 py-3 border-2 border-yellow-300 rounded-lg font-mono focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors uppercase"
+                    >
+                </div>
+
+                <button 
+                    type="submit" 
+                    id="submitBtn" 
+                    class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-200 transition-all flex justify-center items-center shadow-md hover:shadow-lg"
+                >
+                    <span id="btnText">Cek Akses Tryout</span>
+                    <!-- Loading Spinner -->
+                    <svg id="spinner" class="hidden animate-spin ml-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </button>
+            </form>
+        </div>
+
+        <!-- Results Section (Hidden by default) -->
+        <div id="resultsSection" class="hidden bg-slate-50 border-t border-gray-100 p-8">
+            <div id="resultsContent" class="space-y-4">
+                <!-- Data injected here via JS -->
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // Mapping of ID codes to full Bidang names based on instructions
+        const bidangMapping = {
+            'MAT': 'MATEMATIKA',
+            'KOM': 'KOMPUTER',
+            'KIM': 'KIMIA',
+            'FIS': 'FISIKA',
+            'AST': 'ASTRONOMI',
+            'BIO': 'BIOLOGI'
+        };
+
+        const baseUrl = 'https://pb-irc.artesparadox.net/api/collections';
+
+        document.getElementById('tryoutForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const idInput = document.getElementById('id_peserta');
+            const submitBtn = document.getElementById('submitBtn');
+            const btnText = document.getElementById('btnText');
+            const spinner = document.getElementById('spinner');
+            const resultsSection = document.getElementById('resultsSection');
+            const resultsContent = document.getElementById('resultsContent');
+            
+            // Format to uppercase to ensure string matching works properly
+            const idPeserta = idInput.value.trim().toUpperCase();
+
+            // UI Loading State
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-75', 'cursor-not-allowed');
+            btnText.textContent = "Memverifikasi...";
+            spinner.classList.remove('hidden');
+            resultsSection.classList.add('hidden');
+            resultsContent.innerHTML = '';
+
+            try {
+                // --- STEP 1: VERIFY ID PESERTA ---
+                const pesertaQueryUrl = `${baseUrl}/peserta_irc/records?filter=(id_peserta='${encodeURIComponent(idPeserta)}')`;
+                const pesertaRes = await fetch(pesertaQueryUrl);
+                
+                if (!pesertaRes.ok) throw new Error("Gagal menghubungi server database.");
+                
+                const pesertaData = await pesertaRes.json();
+
+                if (!pesertaData.items || pesertaData.items.length === 0) {
+                    showError("ID Peserta tidak ditemukan. Pastikan format penulisan sudah benar.");
+                    return;
+                }
+
+                const peserta = pesertaData.items[0];
+
+                // --- STEP 2: PARSE THE ID TO FIND "BIDANG" ---
+                // e.g., F-MAT-R3-D730K -> split by '-' -> ["F", "MAT", "R3", "D730K"]
+                const parts = idPeserta.split('-');
+                let kodeBidang = "UNKNOWN";
+                
+                // Safety check to ensure the ID is formatted with dashes as expected
+                if (parts.length >= 2) {
+                    kodeBidang = parts[1];
+                }
+
+                // Map 'MAT' to 'MATEMATIKA', fallback to extracted code if not in mapping
+                const bidangLomba = bidangMapping[kodeBidang] || kodeBidang;
+
+                // --- STEP 3: FETCH TRYOUT LINK BASED ON "BIDANG" ---
+                btnText.textContent = "Mengambil Data Tryout...";
+                
+                // Note: The API docs said "Requires superuser Authorization" for lomba_irc_tryout. 
+                // If you set the PocketBase API Rule for View/List to public (""), this fetch will work seamlessly.
+                const tryoutQueryUrl = `${baseUrl}/lomba_irc_tryout/records?filter=(bidang='${encodeURIComponent(bidangLomba)}')`;
+                const tryoutRes = await fetch(tryoutQueryUrl);
+                
+                if (!tryoutRes.ok) throw new Error("Gagal mengambil data Tryout (Cek Izin API Pocketbase).");
+                const tryoutData = await tryoutRes.json();
+
+                // --- STEP 4: RENDER RESULTS ---
+                renderSuccess(peserta, tryoutData.items, bidangLomba);
+
+            } catch (error) {
+                console.error("Error:", error);
+                showError(error.message);
+            } finally {
+                // Reset Button State
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+                btnText.textContent = "Cek Akses Tryout";
+                spinner.classList.add('hidden');
+                resultsSection.classList.remove('hidden');
+            }
+        });
+
+        function renderSuccess(peserta, tryoutItems, bidangLomba) {
+            const resultsContent = document.getElementById('resultsContent');
+            
+            // Participant Info Card
+            let html = `
+                <div class="bg-blue-50 border border-blue-200 p-4 rounded-lg mb-4">
+                    <p class="text-sm text-blue-600 mb-1">Peserta Terverifikasi</p>
+                    <p class="font-bold text-lg text-blue-900">${escapeHTML(peserta.nama)}</p>
+                    <p class="text-sm font-mono text-gray-600 mt-1">${escapeHTML(peserta.id_peserta)}</p>
+                </div>
+            `;
+
+            // Tryout Logic
+            if (!tryoutItems || tryoutItems.length === 0) {
+                html += `
+                    <div class="bg-yellow-100 text-yellow-800 p-4 rounded-lg border border-yellow-300">
+                        <p class="font-bold">Tryout belum tersedia.</p>
+                        <p class="text-sm mt-1">Belum ada jadwal tryout untuk bidang <span class="font-semibold">${escapeHTML(bidangLomba)}</span> saat ini.</p>
+                    </div>
+                `;
+            } else {
+                // We'll loop through just in case there are multiple tryouts for the same subject
+                tryoutItems.forEach(tryout => {
+                    const isAktif = tryout.aktif === true;
+                    
+                    html += `
+                        <div class="bg-white border-l-4 ${isAktif ? 'border-red-500' : 'border-gray-400'} shadow p-5 rounded-r-lg ring-1 ring-gray-100">
+                            <div class="flex justify-between items-start mb-2">
+                                <div>
+                                    <span class="inline-block px-2 py-1 text-xs font-bold rounded-full mb-2 ${isAktif ? 'bg-yellow-200 text-yellow-800' : 'bg-gray-200 text-gray-600'}">
+                                        ${escapeHTML(tryout.jenis)}
+                                    </span>
+                                    <h3 class="font-bold text-lg text-slate-800">${escapeHTML(tryout.judul)}</h3>
+                                    <p class="text-sm text-gray-500 font-medium">Bidang: ${escapeHTML(tryout.bidang)}</p>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-4">
+                                ${isAktif 
+                                    ? `<a href="${escapeHTML(tryout.link)}" target="_blank" rel="noopener noreferrer" class="block w-full text-center bg-red-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-red-700 transition-colors shadow">
+                                        Mulai Tryout Sekarang
+                                       </a>` 
+                                    : `<button disabled class="w-full bg-gray-100 text-gray-500 font-bold py-3 px-4 rounded-lg border border-gray-200 cursor-not-allowed">
+                                        Tryout Belum Aktif
+                                       </button>`
+                                }
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            resultsContent.innerHTML = html;
+        }
+
+        function showError(message) {
+            const resultsContent = document.getElementById('resultsContent');
+            resultsContent.innerHTML = `
+                <div class="bg-red-50 text-red-700 p-4 rounded-lg border border-red-200 flex items-start">
+                    <svg class="w-5 h-5 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path></svg>
+                    <div>
+                        <p class="font-bold">Gagal memverifikasi</p>
+                        <p class="text-sm mt-1">${escapeHTML(message)}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Utility to escape HTML to prevent XSS
+        function escapeHTML(str) {
+            if (str === null || str === undefined) return '';
+            return str.toString().replace(/[&<>'"]/g, 
+                tag => ({
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    "'": '&#39;',
+                    '"': '&quot;'
+                }[tag] || tag)
+            );
+        }
+    </script>
+</body>
+</html>
